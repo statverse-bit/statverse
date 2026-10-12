@@ -1,348 +1,372 @@
-<!doctype html>
-<html lang="en" class="dark">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Statverse — Living Map of Attention</title>
-    <meta name="description" content="A real-time visual map of collective attention across companies, creators, musicians, authors, and internet trends." />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='38' cy='46' r='30' fill='%2310b981' fill-opacity='.25' stroke='%2310b981' stroke-width='4'/%3E%3Ccircle cx='72' cy='68' r='18' fill='%236366f1' fill-opacity='.25' stroke='%236366f1' stroke-width='4'/%3E%3C/svg%3E" />
-    
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet" />
-    
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['"Space Grotesk"', 'sans-serif'],
-              mono: ['"JetBrains Mono"', 'monospace'],
-            },
-            colors: {
-              obsidian: '#05050A',
-              deepnavy: '#0B0F19',
-              glassbg: 'rgba(11, 15, 25, 0.75)',
-              glassborder: 'rgba(255, 255, 255, 0.1)',
-            },
-            animation: {
-              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              'float': 'float 6s ease-in-out infinite',
-            },
-            keyframes: {
-              float: {
-                '0%, 100%': { transform: 'translateY(0px)' },
-                '50%': { transform: 'translateY(-6px)' },
-              }
-            }
-          }
-        }
-      }
-    </script>
 
-    <style>
-      body {
-        background-color: #05050A;
-        color: #F3F4F6;
-        font-family: 'Space Grotesk', sans-serif;
-        overflow: hidden;
-      }
-      .cyber-grid {
-        background-image: 
-          linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-          linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-        background-size: 40px 40px;
-      }
-      .glass-panel {
-        background: rgba(11, 15, 25, 0.78);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-      }
-      .glow-green { box-shadow: 0 0 25px rgba(16, 185, 129, 0.35); }
-      .glow-blue { box-shadow: 0 0 25px rgba(59, 130, 246, 0.35); }
-      .glow-purple { box-shadow: 0 0 25px rgba(168, 85, 247, 0.35); }
-      .glow-rose { box-shadow: 0 0 25px rgba(244, 63, 94, 0.35); }
-      .glow-amber { box-shadow: 0 0 25px rgba(245, 158, 11, 0.35); }
-      
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar { width: 6px; height: 6px; }
-      ::-webkit-scrollbar-track { background: #05050A; }
-      ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
-      ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
-    </style>
+const { useState, useMemo } = React;
 
-    <!-- React & Babel for in-browser JSX rendering -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  </head>
-  <body class="cyber-grid min-h-screen">
-    <div id="root"></div>
+// Illustrative demo values only. Replace with a verified market-data API.
+const INITIAL_ENTITIES = [
+  { id: 1, ticker: "NVDA", name: "NVIDIA", marketCap: 4500, price: 185.00, change: 1.8, sector: "Technology" },
+  { id: 2, ticker: "MSFT", name: "Microsoft", marketCap: 3800, price: 510.00, change: 0.6, sector: "Technology" },
+  { id: 3, ticker: "AAPL", name: "Apple", marketCap: 3500, price: 235.00, change: 0.4, sector: "Technology" },
+  { id: 4, ticker: "AMZN", name: "Amazon", marketCap: 2400, price: 225.00, change: -0.5, sector: "Consumer Discretionary" },
+  { id: 5, ticker: "GOOGL", name: "Alphabet", marketCap: 2300, price: 195.00, change: 1.1, sector: "Communication Services" },
+  { id: 6, ticker: "META", name: "Meta Platforms", marketCap: 1800, price: 625.00, change: 1.4, sector: "Communication Services" },
+  { id: 7, ticker: "AVGO", name: "Broadcom", marketCap: 1500, price: 330.00, change: 2.1, sector: "Technology" },
+  { id: 8, ticker: "BRK.B", name: "Berkshire Hathaway", marketCap: 1100, price: 485.00, change: 0.2, sector: "Financials" },
+  { id: 9, ticker: "LLY", name: "Eli Lilly", marketCap: 850, price: 790.00, change: -0.7, sector: "Healthcare" },
+  { id: 10, ticker: "TSLA", name: "Tesla", marketCap: 1000, price: 340.00, change: 2.8, sector: "Consumer Discretionary" },
+  { id: 11, ticker: "JPM", name: "JPMorgan Chase", marketCap: 800, price: 275.00, change: -0.3, sector: "Financials" },
+  { id: 12, ticker: "WMT", name: "Walmart", marketCap: 750, price: 95.00, change: 0.8, sector: "Consumer Staples" },
+  { id: 13, ticker: "V", name: "Visa", marketCap: 700, price: 350.00, change: 0.5, sector: "Financials" },
+  { id: 14, ticker: "XOM", name: "Exxon Mobil", marketCap: 500, price: 115.00, change: -0.4, sector: "Energy" },
+  { id: 15, ticker: "MA", name: "Mastercard", marketCap: 520, price: 560.00, change: 0.9, sector: "Financials" },
+  { id: 16, ticker: "COST", name: "Costco", marketCap: 420, price: 950.00, change: 0.7, sector: "Consumer Staples" },
+  { id: 17, ticker: "NFLX", name: "Netflix", marketCap: 450, price: 1100.00, change: 1.6, sector: "Communication Services" },
+  { id: 18, ticker: "ORCL", name: "Oracle", marketCap: 600, price: 185.00, change: -0.2, sector: "Technology" },
+  { id: 19, ticker: "KO", name: "Coca-Cola", marketCap: 300, price: 72.00, change: 0.1, sector: "Consumer Staples" },
+  { id: 20, ticker: "AMD", name: "AMD", marketCap: 280, price: 165.00, change: -1.2, sector: "Technology" }
+];
 
-    <script type="text/babel">
-      const { useState, useEffect, useRef } = React;
+function App() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("marketCap");
+  const [selectedTicker, setSelectedTicker] = useState("NVDA");
 
-      const INITIAL_ENTITIES = [
-        { id: 1, name: "NVIDIA", category: "Companies", rank: 3, presence: 94.2, momentum: 89.4, sevenDay: "+14.2%", thirtyDay: "+32.1%", weeklyDelta: "+8 pts", contributors: { "Search interest": 35, "News mentions": 28, "Social discussion": 22, "Market activity": 15 }, description: "Dominant AI hardware ecosystem leader experiencing unprecedented datacenter demand.", status: "rising", color: "#10b981", initials: "NV" },
-        { id: 2, name: "OpenAI", category: "Companies", rank: 1, presence: 98.7, momentum: 96.1, sevenDay: "+18.5%", thirtyDay: "+45.3%", weeklyDelta: "+12 pts", contributors: { "API adoption": 38, "News mentions": 30, "Research velocity": 20, "User growth": 12 }, description: "Pioneering frontier intelligence models and agentic workflows worldwide.", status: "rising", color: "#10b981", initials: "OA" },
-        { id: 3, name: "MrBeast", category: "Creators", rank: 5, presence: 91.0, momentum: 82.4, sevenDay: "+5.1%", thirtyDay: "+19.0%", weeklyDelta: "+3 pts", contributors: { "View velocity": 40, "Subscriber velocity": 25, "Cross-platform buzz": 20, "Merch volume": 15 }, description: "Global creator economy titan expanding studio distribution and philanthropic formats.", status: "rising", color: "#3b82f6", initials: "MB" },
-        { id: 4, name: "Taylor Swift", category: "Musicians", rank: 2, presence: 96.5, momentum: 88.0, sevenDay: "+9.3%", thirtyDay: "+24.8%", weeklyDelta: "+5 pts", contributors: { "Streaming velocity": 42, "Tour impact": 30, "Social sentiment": 18, "Media coverage": 10 }, description: "Unrivaled global touring and streaming phenomenon setting cultural benchmarks.", status: "rising", color: "#6366f1", initials: "TS" },
-        { id: 5, name: "Imara Nkosi", category: "Authors", rank: 4, presence: 74.0, momentum: 87.0, sevenDay: "+8.0%", thirtyDay: "+29.3%", weeklyDelta: "+6 pts", contributors: { "Sales velocity": 30, "Review volume": 25, "Media coverage": 25, "Library holds": 20 }, description: "Climate fiction author whose near-future narratives are being adapted for a major streaming series.", status: "rising", color: "#f43f5e", initials: "IN" },
-        { id: 6, name: "Quantum Computing Breakthrough", category: "Trends", rank: 12, presence: 83.2, momentum: 92.5, sevenDay: "+22.4%", thirtyDay: "+51.0%", weeklyDelta: "+14 pts", contributors: { "Research papers": 40, "Tech discussions": 30, "VC funding interest": 20, "News velocity": 10 }, description: "Rapid acceleration in error-corrected qubit stability and commercial feasibility.", status: "rising", color: "#f59e0b", initials: "QC" },
-        { id: 7, name: "Stripe", category: "Companies", rank: 18, presence: 81.5, momentum: 78.0, sevenDay: "+3.2%", thirtyDay: "+12.4%", weeklyDelta: "-1 pt", contributors: { "Developer adoption": 35, "Transaction volume": 30, "Enterprise contracts": 20, "Ecosystem PR": 15 }, description: "Core financial infrastructure powering modern global internet commerce.", status: "stable", color: "#10b981", initials: "ST" },
-        { id: 8, name: "Kai Cenat", category: "Creators", rank: 9, presence: 86.4, momentum: 90.1, sevenDay: "+15.8%", thirtyDay: "+38.2%", weeklyDelta: "+9 pts", contributors: { "Concurrent viewers": 45, "Clip virality": 30, "Sponsorship value": 15, "Chat velocity": 10 }, description: "Live streaming powerhouse breaking concurrent viewership records on Twitch.", status: "rising", color: "#3b82f6", initials: "KC" },
-        { id: 9, name: "Neuralink", category: "Companies", rank: 15, presence: 82.1, momentum: 85.3, sevenDay: "+11.1%", thirtyDay: "+28.5%", weeklyDelta: "+4 pts", contributors: { "Clinical trial updates": 40, "Media attention": 30, "Engineering talent": 20, "Public discourse": 10 }, description: "Brain-computer interface developer restoring motor autonomy in human clinical trials.", status: "rising", color: "#10b981", initials: "NL" },
-        { id: 10, name: "Solana DeFi Surge", category: "Trends", rank: 22, presence: 79.8, momentum: 89.0, sevenDay: "+19.2%", thirtyDay: "+44.1%", weeklyDelta: "+11 pts", contributors: { "On-chain volume": 40, "Developer commits": 25, "Social sentiment": 20, "Liquidity inflow": 15 }, description: "High-throughput decentralized finance protocols experiencing explosive user adoption.", status: "rising", color: "#f59e0b", initials: "SD" },
-      ];
+  const entities = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
 
-      function App() {
-        const [activeCategory, setActiveCategory] = useState("All");
-        const [searchQuery, setSearchQuery] = useState("");
-        const [selectedEntity, setSelectedEntity] = useState(INITIAL_ENTITIES[4]); // Default to Imara Nkosi
-        const [zoom, setZoom] = useState(1);
-        const [pan, setPan] = useState({ x: 0, y: 0 });
-        const [isDragging, setIsDragging] = useState(false);
-        const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const filtered = INITIAL_ENTITIES.filter(entity =>
+      entity.name.toLowerCase().includes(query) ||
+      entity.ticker.toLowerCase().includes(query) ||
+      entity.sector.toLowerCase().includes(query)
+    );
 
-        // Filter entities
-        const filteredEntities = INITIAL_ENTITIES.filter(entity => {
-          const matchesCat = activeCategory === "All" || entity.category === activeCategory;
-          const matchesSearch = entity.name.toLowerCase().includes(searchQuery.toLowerCase()) || entity.description.toLowerCase().includes(searchQuery.toLowerCase());
-          return matchesCat && matchesSearch;
-        });
+    return filtered.sort((a, b) => {
+      if (sortBy === "change") return b.change - a.change;
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      return b.marketCap - a.marketCap;
+    });
+  }, [searchQuery, sortBy]);
 
-        // Mouse drag panning handlers
-        const handleMouseDown = (e) => {
-          if (e.target.closest('.interactive-node') || e.target.closest('#sidebar') || e.target.closest('#header-nav')) return;
-          setIsDragging(true);
-          setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-        };
+  const selectedEntity =
+    entities.find(entity => entity.ticker === selectedTicker) ||
+    entities[0] ||
+    null;
 
-        const handleMouseMove = (e) => {
-          if (!isDragging) return;
-          setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
-        };
+  // Logarithmic scaling prevents the largest companies from dominating
+  // the entire canvas. Market cap values here are demo proxies in billions.
+  const getBubbleSize = marketCap => {
+    const minCap = Math.log(280);
+    const maxCap = Math.log(4500);
+    const normalized =
+      (Math.log(marketCap) - minCap) / (maxCap - minCap);
 
-        const handleMouseUp = () => setIsDragging(false);
+    return Math.round(76 + normalized * 100);
+  };
 
-        const handleWheel = (e) => {
-          e.preventDefault();
-          const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-          setZoom(prev => Math.min(Math.max(prev * zoomFactor, 0.6), 2.5));
-        };
+  const formatMarketCap = value => {
+    if (value >= 1000) {
+      return `$${(value / 1000).toFixed(2)}T`;
+    }
+    return `$${value.toFixed(0)}B`;
+  };
 
-        return (
-          <div 
-            className="relative w-screen h-screen flex flex-col select-none overflow-hidden"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onWheel={handleWheel}
-          >
-            {/* Ambient Radial Glow Background */}
-            <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            <div className="absolute bottom-1/4 right-1/3 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+  const formatPrice = value =>
+    value.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
 
-            {/* Header / Nav Bar */}
-            <header id="header-nav" className="z-30 flex flex-col md:flex-row items-center justify-between px-6 py-4 glass-panel border-b border-white/10 gap-4">
-              <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-indigo-600 flex items-center justify-center font-bold text-obsidian text-sm glow-green">
-                    SV
-                  </div>
-                  <div>
-                    <h1 className="font-bold tracking-wider text-white text-lg flex items-center gap-2">
-                      STATVERSE <span className="text-xs font-mono font-normal text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">LIVE</span>
-                    </h1>
-                    <p className="text-xs font-mono text-gray-400">Living Map of Attention</p>
-                  </div>
-                </div>
+  return (
+    <div className="min-h-screen bg-white text-slate-900">
 
-                {/* Quick stats counter */}
-                <div className="hidden lg:flex items-center gap-6 text-xs font-mono text-gray-400 border-l border-white/10 pl-6">
-                  <div><strong className="text-white">12,483</strong> tracked</div>
-                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> <strong className="text-emerald-400">183</strong> rising fast</div>
-                  <div><strong className="text-white">42</strong> new today</div>
-                </div>
-              </div>
-
-              {/* Category Pills & Search */}
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    placeholder="Search entities, creators..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-black/40 border border-white/15 rounded-lg px-3.5 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 font-mono w-48 sm:w-64 transition-all"
-                  />
-                </div>
-
-                <div className="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/10 overflow-x-auto">
-                  {["All", "Companies", "Creators", "Musicians", "Authors", "Trends"].map(cat => (
-                    <button
-                      key={cat}
-                      onClick={() => setActiveCategory(cat)}
-                      className={`px-3 py-1 rounded-md text-xs font-mono transition-all whitespace-nowrap ${activeCategory === cat ? 'bg-emerald-500 text-obsidian font-bold shadow-lg shadow-emerald-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </header>
-
-            {/* Main Interactive Map Viewport */}
-            <main className="relative flex-1 overflow-hidden cursor-grab active:cursor-grabbing">
-              <div 
-                className="absolute inset-0 transition-transform duration-75 ease-out flex items-center justify-center"
-                style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
-              >
-                <div className="relative w-[1100px] h-[700px] flex items-center justify-center">
-                  {/* Organic Floating Nodes Layout */}
-                  {filteredEntities.map((entity, idx) => {
-                    // Predefined aesthetic scatter coordinates for immersive visual balance
-                    const positions = [
-                      { x: -300, y: -120 }, { x: 120, y: -180 }, { x: -80, y: 140 },
-                      { x: 260, y: 60 }, { x: -220, y: 80 }, { x: 40, y: -40 },
-                      { x: 180, y: -120 }, { x: -140, y: -40 }, { x: -20, y: 220 }, { x: 220, y: 180 }
-                    ];
-                    const pos = positions[idx % positions.length];
-                    const isSelected = selectedEntity?.id === entity.id;
-                    const sizeClass = entity.presence > 90 ? 'w-28 h-28 text-base' : entity.presence > 80 ? 'w-24 h-24 text-sm' : 'w-20 h-20 text-xs';
-                    const glowClass = entity.category === 'Companies' ? 'glow-green border-emerald-500/50' : entity.category === 'Creators' ? 'glow-blue border-blue-500/50' : entity.category === 'Musicians' ? 'glow-purple border-purple-500/50' : entity.category === 'Authors' ? 'glow-rose border-rose-500/50' : 'glow-amber border-amber-500/50';
-
-                    return (
-                      <div
-                        key={entity.id}
-                        onClick={(e) => { e.stopPropagation(); setSelectedEntity(entity); }}
-                        style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
-                        className={`interactive-node absolute rounded-full flex flex-col items-center justify-center cursor-pointer transition-all duration-300 animate-float hover:scale-110 ${sizeClass} ${glowClass} ${isSelected ? 'ring-4 ring-white scale-110 z-20' : 'z-10'}`}
-                        style={{
-                          transform: `translate(${pos.x}px, ${pos.y}px)`,
-                          background: `radial-gradient(circle at 30% 30%, ${entity.color}22, rgba(11,15,25,0.9))`
-                        }}
-                      >
-                        <div className="absolute inset-0 rounded-full border border-white/20"></div>
-                        <span className="font-bold text-white tracking-wider z-10">{entity.initials}</span>
-                        <span className="text-[10px] font-mono text-gray-300 z-10 max-w-[70px] truncate px-1">{entity.name}</span>
-                        <div className="absolute -bottom-2 px-1.5 py-0.5 rounded-full text-[9px] font-mono bg-black/80 border border-white/20 text-emerald-400">
-                          #{entity.rank}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Map Controls / Legend Footer */}
-              <div className="absolute bottom-6 left-6 z-20 glass-panel rounded-xl p-3.5 flex flex-col gap-2 text-xs font-mono">
-                <div className="text-gray-400 font-bold mb-1 uppercase tracking-wider text-[10px]">Categories & Legend</div>
-                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]"></span> Companies</div>
-                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6]"></span> Creators</div>
-                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_10px_#a855f7]"></span> Musicians</div>
-                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_10px_#f43f5e]"></span> Authors</div>
-                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_10px_#f59e0b]"></span> Trends</div>
-              </div>
-
-              <div className="absolute bottom-6 right-6 z-20 text-xs font-mono text-gray-500 bg-black/40 px-3 py-1.5 rounded-lg border border-white/10">
-                Drag to pan • Scroll to zoom • Click node to inspect
-              </div>
-            </main>
-
-            {/* Glassmorphism Sidebar Detail Panel */}
-            {selectedEntity && (
-              <aside id="sidebar" className="absolute top-20 right-6 bottom-6 w-96 glass-panel rounded-2xl z-40 p-6 flex flex-col justify-between overflow-y-auto border border-white/15 shadow-2xl animate-[fadeIn_0.2s_ease-out]">
-                <div>
-                  <div className="flex items-start justify-between pb-4 border-b border-white/10">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-white border border-white/10">{selectedEntity.category}</span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Rank #{selectedEntity.rank}</span>
-                      </div>
-                      <h2 className="text-2xl font-bold text-white tracking-tight">{selectedEntity.name}</h2>
-                    </div>
-                    <button 
-                      onClick={() => setSelectedEntity(null)}
-                      className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  {/* Scores Grid */}
-                  <div className="grid grid-cols-2 gap-3 my-5">
-                    <div className="bg-black/40 p-3.5 rounded-xl border border-white/10">
-                      <div className="text-[10px] font-mono text-gray-400 mb-1 uppercase tracking-wider">Presence Score</div>
-                      <div className="text-2xl font-bold font-mono text-white">{selectedEntity.presence}</div>
-                    </div>
-                    <div className="bg-black/40 p-3.5 rounded-xl border border-white/10">
-                      <div className="text-[10px] font-mono text-gray-400 mb-1 uppercase tracking-wider">Momentum</div>
-                      <div className="text-2xl font-bold font-mono text-emerald-400">{selectedEntity.momentum}</div>
-                    </div>
-                  </div>
-
-                  {/* Growth stats */}
-                  <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 mb-5 font-mono text-xs flex items-center justify-between">
-                    <div>
-                      <span className="text-gray-400 block text-[10px]">7-DAY CHANGE</span>
-                      <span className="text-emerald-400 font-bold text-sm">{selectedEntity.sevenDay}</span>
-                    </div>
-                    <div className="border-l border-white/10 pl-4">
-                      <span className="text-gray-400 block text-[10px]">30-DAY CHANGE</span>
-                      <span className="text-white font-bold text-sm">{selectedEntity.thirtyDay}</span>
-                    </div>
-                    <div className="border-l border-white/10 pl-4">
-                      <span className="text-gray-400 block text-[10px]">MOMENTUM</span>
-                      <span className="text-emerald-400 font-bold text-sm">{selectedEntity.weeklyDelta}</span>
-                    </div>
-                  </div>
-
-                  {/* Score Contributors */}
-                  <div className="mb-6">
-                    <h3 className="text-xs font-mono uppercase tracking-wider text-gray-400 mb-3">Score Contributors</h3>
-                    <div className="space-y-2 font-mono text-xs">
-                      {Object.entries(selectedEntity.contributors).map(([label, val]) => (
-                        <div key={label}>
-                          <div className="flex justify-between text-gray-300 mb-1">
-                            <span>{label}</span>
-                            <span className="text-emerald-400">{val}%</span>
-                          </div>
-                          <div className="w-full bg-black/60 h-1.5 rounded-full overflow-hidden border border-white/10">
-                            <div className="bg-gradient-to-r from-emerald-500 to-indigo-500 h-full rounded-full" style={{ width: `${val * 2}%` }}></div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* About / Description */}
-                  <div>
-                    <h3 className="text-xs font-mono uppercase tracking-wider text-gray-400 mb-2">About Entity</h3>
-                    <p className="text-xs text-gray-300 leading-relaxed">{selectedEntity.description}</p>
-                  </div>
-                </div>
-
-                {/* Status footer inside sidebar */}
-                <div className="pt-4 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-gray-400">
-                  <span>Verified data stream</span>
-                  <button className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-obsidian font-bold transition-all shadow-lg shadow-emerald-500/20">
-                    Share Ranking ↗
-                  </button>
-                </div>
-              </aside>
-            )}
+      {/* Header */}
+      <header className="sticky top-0 z-30 flex flex-col gap-4 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur md:flex-row md:items-center md:justify-between md:px-8">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-700 text-sm font-bold text-white">
+            SV
           </div>
-        );
-      }
 
-      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-    </script>
-  </body>
-</html>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight">
+              STATVERSE
+            </h1>
+            <p className="text-xs text-slate-500">
+              S&P 500 Market Map
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <span className="h-2 w-2 rounded-full bg-amber-500" />
+          DEMO DATA · NOT LIVE
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-[1600px] px-5 py-8 md:px-8">
+
+        {/* Introduction */}
+        <section className="mb-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
+            The market, visualized
+          </p>
+
+          <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-3xl font-semibold tracking-tight md:text-5xl">
+                Follow the market.
+              </h2>
+
+              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-500">
+                Explore major S&P 500 companies through an interactive
+                map. Bubble size represents relative market capitalization;
+                color represents daily price direction.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={event => setSearchQuery(event.target.value)}
+                placeholder="Search companies or tickers..."
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-600 sm:w-64"
+              />
+
+              <select
+                value={sortBy}
+                onChange={event => setSortBy(event.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-600"
+              >
+                <option value="marketCap">Largest companies</option>
+                <option value="change">Daily performance</option>
+                <option value="name">Alphabetical</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        {/* Overview statistics */}
+        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {[
+            {
+              label: "Market",
+              value: "S&P 500",
+              note: "Large-cap US equities"
+            },
+            {
+              label: "Companies displayed",
+              value: String(entities.length),
+              note: "Selected sample, not all constituents"
+            },
+            {
+              label: "Sizing method",
+              value: "Logarithmic",
+              note: "Visual scaling of relative company size"
+            }
+          ].map(stat => (
+            <div
+              key={stat.label}
+              className="rounded-2xl border border-slate-200 bg-white p-5"
+            >
+              <p className="text-xs uppercase tracking-wider text-slate-500">
+                {stat.label}
+              </p>
+              <p className="mt-3 text-2xl font-semibold tracking-tight">
+                {stat.value}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {stat.note}
+              </p>
+            </div>
+          ))}
+        </section>
+
+        {/* Main visualization and company details */}
+        <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+
+          {/* Bubble map */}
+          <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold">
+                  Company map
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Select a bubble to explore a company
+                </p>
+              </div>
+
+              <div className="flex items-center gap-4 text-xs text-slate-500">
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                  Up
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-rose-500" />
+                  Down
+                </span>
+              </div>
+            </div>
+
+            <div
+              className="flex min-h-[540px] flex-wrap items-center justify-center gap-3 overflow-hidden p-5 md:gap-4 md:p-8"
+              style={{
+                backgroundColor: "#fcfdfc",
+                backgroundImage:
+                  "radial-gradient(#e5ebe7 1px, transparent 1px)",
+                backgroundSize: "22px 22px"
+              }}
+            >
+              {entities.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  No companies match your search.
+                </p>
+              ) : (
+                entities.map(entity => {
+                  const size = getBubbleSize(entity.marketCap);
+                  const isSelected =
+                    selectedEntity?.ticker === entity.ticker;
+                  const isPositive = entity.change >= 0;
+
+                  return (
+                    <button
+                      key={entity.ticker}
+                      type="button"
+                      onClick={() => setSelectedTicker(entity.ticker)}
+                      aria-pressed={isSelected}
+                      title={`${entity.name} (${entity.ticker})`}
+                      className={[
+                        "flex shrink-0 flex-col items-center justify-center rounded-full border transition duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-500",
+                        isPositive
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                          : "border-rose-200 bg-rose-50 text-rose-900",
+                        isSelected
+                          ? "ring-2 ring-emerald-700 ring-offset-2"
+                          : "shadow-sm hover:shadow-md"
+                      ].join(" ")}
+                      style={{
+                        width: `${size}px`,
+                        height: `${size}px`
+                      }}
+                    >
+                      <span className="px-1 text-xs font-bold">
+                        {entity.ticker}
+                      </span>
+
+                      <span className="mt-1 max-w-[90%] truncate px-1 text-[9px]">
+                        {entity.name}
+                      </span>
+
+                      <span className="mt-1 text-[10px] font-medium">
+                        {entity.change > 0 ? "+" : ""}
+                        {entity.change.toFixed(1)}%
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Selected company panel */}
+          <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-6">
+            {selectedEntity ? (
+              <>
+                <div className="border-b border-slate-100 pb-5">
+                  <span className="inline-flex rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-800">
+                    S&P 500 constituent
+                  </span>
+
+                  <h3 className="mt-4 text-2xl font-semibold tracking-tight">
+                    {selectedEntity.name}
+                  </h3>
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    {selectedEntity.ticker} · {selectedEntity.sector}
+                  </p>
+
+                  <p className="mt-6 text-3xl font-semibold tracking-tight">
+                    {formatPrice(selectedEntity.price)}
+                  </p>
+
+                  <p
+                    className={`mt-2 text-sm font-medium ${
+                      selectedEntity.change >= 0
+                        ? "text-emerald-700"
+                        : "text-rose-600"
+                    }`}
+                  >
+                    {selectedEntity.change > 0 ? "+" : ""}
+                    {selectedEntity.change.toFixed(2)}% demo daily change
+                  </p>
+                </div>
+
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500">
+                      Demo size proxy
+                    </p>
+                    <p className="mt-2 text-lg font-semibold">
+                      {formatMarketCap(selectedEntity.marketCap)}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500">
+                      Daily direction
+                    </p>
+                    <p
+                      className={`mt-2 text-lg font-semibold ${
+                        selectedEntity.change >= 0
+                          ? "text-emerald-700"
+                          : "text-rose-600"
+                      }`}
+                    >
+                      {selectedEntity.change >= 0 ? "Positive" : "Negative"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    About this visualization
+                  </h4>
+                  <p className="mt-3 text-xs leading-6 text-slate-500">
+                    Bubble size uses a logarithmic transform of the
+                    illustrative size proxy. Actual market capitalization,
+                    stock price, and daily change have not been verified
+                    against a live data source.
+                  </p>
+                </div>
+
+                <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-xs font-semibold text-amber-900">
+                    Demo mode
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-amber-800">
+                    Connect a financial-data provider before publishing
+                    market figures as current or live.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-slate-500">
+                Select a company bubble to inspect it.
+              </p>
+            )}
+          </aside>
+        </section>
+
+        <footer className="mt-6 flex flex-col gap-2 border-t border-slate-200 pt-4 text-[10px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+          <span>STATVERSE / S&P 500 EXPLORER</span>
+          <span>
+            Illustrative values · Not connected to live market data
+          </span>
+        </footer>
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
